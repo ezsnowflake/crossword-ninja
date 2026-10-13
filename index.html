@@ -442,7 +442,7 @@ async function submitForm() {
 
   // Duplicate check against backend
   if (BACKEND_URL) {
-    const btn = document.querySelector('#step-register .btn-primary');
+    const btn = document.querySelector('#step-form .btn-primary');
     const origText = btn.textContent;
     btn.textContent = 'Checking...';
     btn.disabled = true;
