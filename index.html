@@ -226,12 +226,12 @@ body{
       <div class="form-group">
         <label>Business Email</label>
         <input type="email" id="f-email" placeholder="john@company.com" required>
-        <div class="error-msg">Please enter a valid business email</div>
+        <div class="error-msg" id="err-email">Please enter a valid business email</div>
       </div>
       <div class="form-group">
         <label>Contact Number</label>
         <input type="tel" id="f-phone" placeholder="+65 6789 0123" required>
-        <div class="error-msg">Please enter your contact number</div>
+        <div class="error-msg" id="err-phone">Please enter your contact number</div>
       </div>
       <div class="form-group">
         <label>Organisation / Company</label>
@@ -360,22 +360,62 @@ function goToStep(id) {
 }
 
 // ── FORM ──
-function submitForm() {
-  const fields = [
-    { id:'f-first', validate: v => v.trim().length > 0 },
-    { id:'f-last',  validate: v => v.trim().length > 0 },
-    { id:'f-email', validate: v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) },
-    { id:'f-phone', validate: v => v.trim().length >= 6 },
-    { id:'f-company', validate: v => v.trim().length > 0 },
-    { id:'f-title', validate: v => v.trim().length > 0 }
+function isValidEmail(v) {
+  return /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(v.trim());
+}
+
+function isFakePhone(v) {
+  const digits = v.replace(/[^0-9]/g, '');
+  if (digits.length < 7) return true;
+  // All same digit: 00000000, 11111111 etc.
+  if (/^(\d)\1+$/.test(digits)) return true;
+  // Sequential ascending: 12345678
+  const asc = '0123456789';
+  if (digits.length >= 7 && asc.includes(digits)) return true;
+  // Sequential descending: 87654321
+  const desc = '9876543210';
+  if (digits.length >= 7 && desc.includes(digits)) return true;
+  // Repeating pattern: 12121212, 12341234
+  for (let pLen = 1; pLen <= 3; pLen++) {
+    const pat = digits.slice(0, pLen);
+    if (pat.repeat(Math.ceil(digits.length / pLen)).slice(0, digits.length) === digits) return true;
+  }
+  return false;
+}
+
+function showFieldError(inputId, errId, msg) {
+  const input = document.getElementById(inputId);
+  const err = document.getElementById(errId) || input.parentElement.querySelector('.error-msg');
+  input.classList.add('error');
+  if (msg) err.textContent = msg;
+  err.style.display = 'block';
+}
+
+function clearFieldError(inputId, errId) {
+  const input = document.getElementById(inputId);
+  const err = document.getElementById(errId) || input.parentElement.querySelector('.error-msg');
+  input.classList.remove('error');
+  err.style.display = 'none';
+}
+
+async function submitForm() {
+  // Basic required-field checks
+  const required = [
+    { id:'f-first', msg:'Please enter your first name' },
+    { id:'f-last',  msg:'Please enter your last name' },
+    { id:'f-email', msg:'Please enter your email' },
+    { id:'f-phone', msg:'Please enter your contact number' },
+    { id:'f-company', msg:'Please enter your company name' },
+    { id:'f-title', msg:'Please enter your job title' }
   ];
 
   let valid = true;
-  fields.forEach(f => {
+  required.forEach(f => {
     const input = document.getElementById(f.id);
     const err = input.parentElement.querySelector('.error-msg');
-    if (!f.validate(input.value)) {
+    if (!input.value.trim()) {
       input.classList.add('error');
+      err.textContent = f.msg;
       err.style.display = 'block';
       valid = false;
     } else {
@@ -386,11 +426,54 @@ function submitForm() {
 
   if (!valid) return;
 
+  // Email format validation
+  const email = document.getElementById('f-email').value.trim();
+  if (!isValidEmail(email)) {
+    showFieldError('f-email', 'err-email', 'Please enter a valid email address');
+    return;
+  }
+
+  // Phone fake-data validation
+  const phone = document.getElementById('f-phone').value.trim();
+  if (isFakePhone(phone)) {
+    showFieldError('f-phone', 'err-phone', 'Please enter a real contact number');
+    return;
+  }
+
+  // Duplicate check against backend
+  if (BACKEND_URL) {
+    const btn = document.querySelector('#step-register .btn-primary');
+    const origText = btn.textContent;
+    btn.textContent = 'Checking...';
+    btn.disabled = true;
+    try {
+      const checkUrl = BACKEND_URL + '?action=check&email=' + encodeURIComponent(email) + '&phone=' + encodeURIComponent(phone);
+      const resp = await fetch(checkUrl);
+      const data = await resp.json();
+      if (data.emailExists) {
+        showFieldError('f-email', 'err-email', 'This email has already been used to play');
+        btn.textContent = origText;
+        btn.disabled = false;
+        return;
+      }
+      if (data.phoneExists) {
+        showFieldError('f-phone', 'err-phone', 'This phone number has already been used to play');
+        btn.textContent = origText;
+        btn.disabled = false;
+        return;
+      }
+    } catch (e) {
+      // If check fails (network etc.), allow submission to proceed
+    }
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
+
   currentEntry = {
     firstName: document.getElementById('f-first').value.trim(),
     lastName: document.getElementById('f-last').value.trim(),
-    email: document.getElementById('f-email').value.trim(),
-    phone: document.getElementById('f-phone').value.trim(),
+    email: email,
+    phone: phone,
     company: document.getElementById('f-company').value.trim(),
     jobTitle: document.getElementById('f-title').value.trim(),
     timestamp: new Date().toISOString(),
