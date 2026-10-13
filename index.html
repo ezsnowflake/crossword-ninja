@@ -84,10 +84,10 @@ body{
 .clue-item:hover,.clue-item.active{background:rgba(41,181,232,.1)}
 .clue-item span{font-weight:700;color:var(--blue)}
 
-.grid-container{display:flex;justify-content:center;margin-bottom:20px;overflow-x:auto}
+.grid-container{display:flex;justify-content:center;margin-bottom:20px}
 .grid{
   display:inline-grid;
-  --cell:min(44px,calc((100vw - 80px)/8));
+  --cell:min(44px,calc((100vw - 110px) / 8));
   grid-template-columns:repeat(8,var(--cell));
   grid-template-rows:repeat(7,var(--cell));
   gap:2px;
@@ -111,8 +111,8 @@ body{
 
 /* Hidden input for mobile keyboard */
 #keyboard-input{
-  position:absolute;top:-9999px;left:-9999px;
-  opacity:0;width:1px;height:1px;
+  position:fixed;bottom:0;left:0;
+  opacity:0;width:1px;height:1px;pointer-events:none;
 }
 
 /* Result */
@@ -525,12 +525,12 @@ function setupKeyboard() {
 function focusKeyboard() {
   const inp = document.getElementById('keyboard-input');
   inp.value = '';
-  inp.focus();
+  inp.focus({preventScroll:true});
   if (selectedCell) {
     setTimeout(() => {
       const el = cells[selectedCell].el;
       el.scrollIntoView({behavior:'smooth',block:'center'});
-    }, 350);
+    }, 400);
   }
 }
 
