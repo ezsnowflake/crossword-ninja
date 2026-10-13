@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Crossword Ninja</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#29B5E8;--dark:#1A1F36;--navy:#0D2240;
+  --green:#00D4AA;--red:#FF6B6B;--bg:#F0F4F8;
+  --card:#FFFFFF;--gray:#8892A0;--light:#E8EDF2;
+}
+html{font-size:16px}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--blue);color:var(--dark);
+  min-height:100dvh;display:flex;justify-content:center;
+  -webkit-tap-highlight-color:transparent;
+  position:relative;overflow-x:hidden;
+}
+/* Ninja peeking from side */
+.ninja-peek{
+  position:absolute;left:50%;top:-130px;transform:translateX(-50%);
+  width:180px;height:180px;pointer-events:none;z-index:2;
+  filter:drop-shadow(0 4px 14px rgba(0,0,0,.22));
+}
+#app{width:100%;max-width:480px;padding:16px;position:relative;overflow-x:hidden;z-index:1}
+
+/* Header */
+.header{text-align:center;padding:20px 0 12px}
+.header svg{width:48px;height:48px}
+.header h1{font-size:1.25rem;font-weight:700;margin-top:8px;color:var(--dark)}
+.header p{font-size:.85rem;color:#64748b;margin-top:4px}
+
+/* Cards */
+.card{
+  background:var(--card);border-radius:16px;
+  padding:24px 20px;margin-bottom:16px;
+  box-shadow:0 2px 12px rgba(0,0,0,.06);
+}
+
+/* Form */
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:.8rem;font-weight:600;color:var(--dark);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.form-group input{
+  width:100%;padding:12px 14px;border:2px solid var(--light);
+  border-radius:10px;font-size:1rem;color:var(--dark);
+  transition:border-color .2s;background:#fff;
+  -webkit-appearance:none;
+}
+.form-group input:focus{outline:none;border-color:var(--blue)}
+.form-group input.error{border-color:var(--red)}
+.error-msg{font-size:.75rem;color:var(--red);margin-top:4px;display:none}
+
+/* Buttons */
+.btn{
+  width:100%;padding:14px;border:none;border-radius:12px;
+  font-size:1rem;font-weight:700;cursor:pointer;
+  transition:transform .15s,opacity .15s;
+  -webkit-appearance:none;
+}
+.btn:active{transform:scale(.97);opacity:.9}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-success{background:var(--green);color:#fff}
+.btn-outline{background:transparent;border:2px solid var(--blue);color:var(--blue)}
+.btn-danger{background:var(--red);color:#fff}
+.btn+.btn{margin-top:10px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* Step transitions */
+.step{display:none;animation:fadeIn .4s ease}
+.step.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+/* Crossword */
+.clues{margin-bottom:20px}
+.clue-section h3{font-size:.8rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.clue-item{
+  font-size:.88rem;color:var(--dark);padding:8px 10px;
+  border-radius:8px;margin-bottom:6px;cursor:pointer;
+  transition:background .2s;line-height:1.4;
+}
+.clue-item:hover,.clue-item.active{background:rgba(41,181,232,.1)}
+.clue-item span{font-weight:700;color:var(--blue)}
+
+.grid-container{display:flex;justify-content:center;margin-bottom:20px;overflow-x:auto}
+.grid{
+  display:inline-grid;
+  grid-template-columns:repeat(8,minmax(36px,44px));
+  grid-template-rows:repeat(7,minmax(36px,44px));
+  gap:2px;
+}
+.cell{
+  width:100%;aspect-ratio:1;border:2px solid var(--light);
+  border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;font-weight:700;color:var(--dark);
+  position:relative;cursor:pointer;background:#fff;
+  transition:border-color .15s,background .15s;
+  -webkit-user-select:none;user-select:none;
+}
+.cell.blank{visibility:hidden;border:none;cursor:default}
+.cell.selected{border-color:var(--blue);background:rgba(41,181,232,.15)}
+.cell.highlighted{background:rgba(41,181,232,.07)}
+.cell.correct{border-color:var(--green);background:rgba(0,212,170,.1)}
+.cell.incorrect{border-color:var(--red);background:rgba(255,107,107,.1)}
+.cell .number{position:absolute;top:2px;left:4px;font-size:.55rem;font-weight:600;color:var(--gray)}
+.cell .letter{font-size:1.1rem}
+
+/* Hidden input for mobile keyboard */
+#keyboard-input{
+  position:absolute;top:-9999px;left:-9999px;
+  opacity:0;width:1px;height:1px;
+}
+
+/* Result */
+.result-icon{font-size:4rem;text-align:center;margin-bottom:12px}
+.result-title{font-size:1.5rem;font-weight:800;text-align:center;margin-bottom:8px;color:var(--dark)}
+.result-msg{font-size:.95rem;color:var(--gray);text-align:center;margin-bottom:20px;line-height:1.5}
+.code-box{
+  background:var(--dark);color:var(--green);
+  font-family:'Courier New',monospace;font-size:1.4rem;font-weight:700;
+  text-align:center;padding:16px;border-radius:12px;
+  margin-bottom:20px;letter-spacing:4px;
+}
+
+/* Confetti */
+.confetti-container{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:999}
+.confetti{
+  position:absolute;width:10px;height:10px;
+  animation:confetti-fall 3s ease-out forwards;
+}
+@keyframes confetti-fall{
+  0%{transform:translateY(-10vh) rotate(0deg);opacity:1}
+  100%{transform:translateY(110vh) rotate(720deg);opacity:0}
+}
+
+/* Admin */
+.admin-bar{
+  background:var(--dark);color:#fff;padding:12px 16px;
+  border-radius:12px;margin-bottom:16px;
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.85rem;
+}
+.admin-table{width:100%;overflow-x:auto;margin-bottom:16px}
+.admin-table table{width:100%;border-collapse:collapse;font-size:.75rem}
+.admin-table th{background:var(--dark);color:#fff;padding:8px 6px;text-align:left;white-space:nowrap}
+.admin-table td{padding:8px 6px;border-bottom:1px solid var(--light);white-space:nowrap}
+.admin-table tr:nth-child(even){background:var(--bg)}
+.badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.7rem;font-weight:700}
+.badge-win{background:rgba(0,212,170,.15);color:var(--green)}
+.badge-lose{background:rgba(255,107,107,.15);color:var(--red)}
+
+/* Utilities */
+.mt-8{margin-top:8px}.mt-16{margin-top:16px}.mb-16{margin-bottom:16px}
+.text-center{text-align:center}
+.text-sm{font-size:.85rem}
+.text-gray{color:var(--gray)}
+.step-form-footer{color:rgba(255,255,255,.5)}
+      .page-footer{text-align:center;font-size:.7rem;color:rgba(255,255,255,.45);padding:16px 8px 8px;line-height:1.4}
+</style>
+</head>
+<body>
+<div id="app">
+  <input type="text" id="keyboard-input" autocomplete="off" autocapitalize="characters" autocorrect="off" inputmode="text">
+
+  <!-- STEP 1: REGISTRATION -->
+  <div id="step-form" class="step active">
+    <div class="card" style="position:relative;overflow:visible;margin-top:140px">
+      <!-- Ninja head peeking over top center -->
+      <svg class="ninja-peek" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Head -->
+        <circle cx="90" cy="58" r="58" fill="#2D3748"/>
+        <!-- Face mask area -->
+        <ellipse cx="90" cy="68" rx="40" ry="22" fill="#4A5568"/>
+        <!-- Headband - Snowflake Blue -->
+        <rect x="28" y="34" width="124" height="24" rx="12" fill="#29B5E8"/>
+        <!-- Headband tails -->
+        <path d="M152 40 Q174 28 180 8" stroke="#29B5E8" stroke-width="10" stroke-linecap="round" fill="none"/>
+        <path d="M152 52 Q176 46 186 32" stroke="#0ea5d0" stroke-width="7" stroke-linecap="round" fill="none"/>
+        <!-- Eyes - big bold kawaii -->
+        <ellipse cx="68" cy="60" rx="16" ry="19" fill="white"/>
+        <ellipse cx="112" cy="60" rx="16" ry="19" fill="white"/>
+        <circle cx="72" cy="63" r="10" fill="#1A202C"/>
+        <circle cx="116" cy="63" r="10" fill="#1A202C"/>
+        <!-- Eye shine -->
+        <circle cx="77" cy="58" r="4.5" fill="white"/>
+        <circle cx="121" cy="58" r="4.5" fill="white"/>
+        <!-- Small sparkle in eyes -->
+        <circle cx="68" cy="55" r="2" fill="white"/>
+        <circle cx="112" cy="55" r="2" fill="white"/>
+        <!-- Blush -->
+        <ellipse cx="46" cy="74" rx="9" ry="4" fill="rgba(41,181,232,.3)"/>
+        <ellipse cx="134" cy="74" rx="9" ry="4" fill="rgba(41,181,232,.3)"/>
+        <!-- Hands gripping card edge -->
+        <rect x="38" y="110" width="22" height="34" rx="11" fill="#2D3748"/>
+        <rect x="120" y="110" width="22" height="34" rx="11" fill="#2D3748"/>
+        <!-- Fingers -->
+        <circle cx="44" cy="144" r="8" fill="#2D3748"/>
+        <circle cx="54" cy="146" r="7" fill="#2D3748"/>
+        <circle cx="126" cy="144" r="8" fill="#2D3748"/>
+        <circle cx="136" cy="146" r="7" fill="#2D3748"/>
+      </svg>
+      <div class="header" style="padding-top:36px;padding-bottom:16px">
+        <svg viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:40px;height:40px"><path fill="#29B5E8" d="M234.9 379a37 37 0 0 1 34.6 36.3v146.3a37.3 37.3 0 0 1-37.4 37.1c-20.5 0-37-16.2-37.5-36.4v-82.1l-71.2 40.7a37.5 37.5 0 0 1-51.1-13.5 37 37 0 0 1 13-50.4l.6-.4L213.1 384c6.9-4 14.5-5.4 21.8-4.8m151 4.4 1 .5L514 456.6a37 37 0 0 1 13.7 50.8 37.5 37.5 0 0 1-50.4 13.9l-.7-.4-71.2-40.7v81.4a37.3 37.3 0 0 1-37.5 37.1c-20.4 0-37-16.2-37.4-36.4V416a37 37 0 0 1 34.6-37q10.7-.8 20.8 4.4M55.5 194.7l.7.4 127 72.7a37 37 0 0 1 1 63.8l-1 .5-127 72.8A37.6 37.6 0 0 1 5 391.4 37 37 0 0 1 18 341l.6-.4 71-40.6-71-40.7a37 37 0 0 1-13.5-50.6 37.6 37.6 0 0 1 50.4-14m539.5 14a37 37 0 0 1-13.7 50.6l-71 40.7 71 40.6a37 37 0 0 1 13.7 50.8 37.6 37.6 0 0 1-51.2 13.5L416.6 332a37 37 0 0 1-17.3-42c2.5-9 8.5-17.2 17.3-22.3L543.8 195a37.6 37.6 0 0 1 51.2 13.6m-287.3 22c2.2 0 5.2 1.1 6.7 2.7l52.9 52.3c1.5 1.5 2.7 4.4 2.7 6.6v15.4c0 2.1-1.2 5-2.7 6.5l-53 52.4a11 11 0 0 1-6.6 2.8h-15.5a11 11 0 0 1-6.6-2.8l-52.9-52.4a11 11 0 0 1-2.7-6.5v-15.4c0-2.2 1.2-5.1 2.7-6.6l52.9-52.3c1.5-1.6 4.5-2.8 6.6-2.8zm-7.4 44.6h-.6c-2.2 0-5.1 1.2-6.6 2.7l-15.3 15a11 11 0 0 0-2.7 6.7v.6c0 2.1 1.1 5 2.7 6.5L293 322c1.5 1.5 4.4 2.7 6.6 2.7h.6c2.1 0 5-1.2 6.6-2.7l15.3-15.2c1.5-1.5 2.8-4.4 2.8-6.5v-.6c0-2.1-1.3-5-2.8-6.6L306.9 278a11 11 0 0 0-6.6-2.7m67.6-274c20.5 0 37 16.2 37.5 36.3v82.2L476.6 79a37.6 37.6 0 0 1 51.1 13.6 37 37 0 0 1-13 50.3l-.7.4-127.2 72.8a38 38 0 0 1-21.7 4.8 37.3 37.3 0 0 1-34.6-36.2V38.4a37 37 0 0 1 37.4-37.1m-135.8 0c20.4 0 37 16.2 37.4 36.3V184a37.3 37.3 0 0 1-34.6 37c-7 .6-14.3-.8-20.9-4.3l-.9-.5L86 143.3a37 37 0 0 1-13.6-50.7 37.6 37.6 0 0 1 50.4-14l.7.4 71.2 40.8V38.4a37.3 37.3 0 0 1 37.5-37.1"/></svg>
+        <h1>Crossword Ninja</h1>
+        <p>Crack the crossword to redeem an exclusive swag!</p>
+      </div>
+      <div style="height:16px"></div>
+      <div class="form-group">
+        <label>First Name</label>
+        <input type="text" id="f-first" placeholder="John" required>
+        <div class="error-msg">Please enter your first name</div>
+      </div>
+      <div class="form-group">
+        <label>Last Name</label>
+        <input type="text" id="f-last" placeholder="Doe" required>
+        <div class="error-msg">Please enter your last name</div>
+      </div>
+      <div class="form-group">
+        <label>Business Email</label>
+        <input type="email" id="f-email" placeholder="john@company.com" required>
+        <div class="error-msg">Please enter a valid business email</div>
+      </div>
+      <div class="form-group">
+        <label>Contact Number</label>
+        <input type="tel" id="f-phone" placeholder="+65 6789 0123" required>
+        <div class="error-msg">Please enter your contact number</div>
+      </div>
+      <div class="form-group">
+        <label>Organisation / Company</label>
+        <input type="text" id="f-company" placeholder="Acme Corp" required>
+        <div class="error-msg">Please enter your company name</div>
+      </div>
+      <div class="form-group">
+        <label>Job Title</label>
+        <input type="text" id="f-title" placeholder="Data Engineer" required>
+        <div class="error-msg">Please enter your job title</div>
+      </div>
+      <button class="btn btn-primary" onclick="submitForm()">Start the Challenge</button>
+    </div>
+    <p class="text-center text-sm step-form-footer">Your info is collected for event purposes only.</p>
+    <p class="page-footer">This game is developed using Snowflake CoCo in under 10 minutes — Ask our booth staff how this is done!</p>
+  </div>
+
+  <!-- STEP 2: CROSSWORD -->
+  <div id="step-game" class="step">
+    <div class="card" style="position:relative;overflow:visible;margin-top:140px">
+      <svg class="ninja-peek" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="90" cy="58" r="58" fill="#2D3748"/><ellipse cx="90" cy="68" rx="40" ry="22" fill="#4A5568"/><rect x="28" y="34" width="124" height="24" rx="12" fill="#29B5E8"/><path d="M152 40 Q174 28 180 8" stroke="#29B5E8" stroke-width="10" stroke-linecap="round" fill="none"/><path d="M152 52 Q176 46 186 32" stroke="#0ea5d0" stroke-width="7" stroke-linecap="round" fill="none"/><ellipse cx="68" cy="60" rx="16" ry="19" fill="white"/><ellipse cx="112" cy="60" rx="16" ry="19" fill="white"/><circle cx="72" cy="63" r="10" fill="#1A202C"/><circle cx="116" cy="63" r="10" fill="#1A202C"/><circle cx="77" cy="58" r="4.5" fill="white"/><circle cx="121" cy="58" r="4.5" fill="white"/><circle cx="68" cy="55" r="2" fill="white"/><circle cx="112" cy="55" r="2" fill="white"/><ellipse cx="46" cy="74" rx="9" ry="4" fill="rgba(41,181,232,.3)"/><ellipse cx="134" cy="74" rx="9" ry="4" fill="rgba(41,181,232,.3)"/><rect x="38" y="110" width="22" height="34" rx="11" fill="#2D3748"/><rect x="120" y="110" width="22" height="34" rx="11" fill="#2D3748"/><circle cx="44" cy="144" r="8" fill="#2D3748"/><circle cx="54" cy="146" r="7" fill="#2D3748"/><circle cx="126" cy="144" r="8" fill="#2D3748"/><circle cx="136" cy="146" r="7" fill="#2D3748"/></svg>
+      <div class="header" style="padding-top:36px;padding-bottom:16px">
+        <h1>Solve the Crossword</h1>
+        <p>Find 3 Snowflake solution keywords</p>
+      </div>
+      <div class="clues">
+        <div class="clue-item" data-word="0" onclick="selectClue(0)">
+          <span>1 Across.</span> The unified foundation for data, apps, and AI &mdash; Snowflake is this for your entire organisation
+        </div>
+        <div class="clue-item" data-word="1" onclick="selectClue(1)">
+          <span>2 Down.</span> Snowflake's integrated governance solution for security, compliance, privacy, and data discovery
+        </div>
+        <div class="clue-item" data-word="2" onclick="selectClue(2)">
+          <span>3 Across.</span> Snowflake's collaboration capability enabling teams to build and share together on live data
+        </div>
+      </div>
+      <div class="grid-container">
+        <div class="grid" id="crossword-grid"></div>
+      </div>
+      <button class="btn btn-primary" onclick="checkAnswers()">Check Answers</button>
+      <button class="btn btn-outline mt-8" onclick="clearGrid()">Clear All</button>
+    </div>
+    <p class="page-footer">This game is developed using Snowflake CoCo in under 10 minutes — Ask our booth staff how this is done!</p>
+  </div>
+
+  <!-- STEP 3: RESULT -->
+  <div id="step-result" class="step">
+    <div class="card" style="position:relative;overflow:visible;margin-top:140px">
+      <svg class="ninja-peek" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="90" cy="58" r="58" fill="#2D3748"/><ellipse cx="90" cy="68" rx="40" ry="22" fill="#4A5568"/><rect x="28" y="34" width="124" height="24" rx="12" fill="#29B5E8"/><path d="M152 40 Q174 28 180 8" stroke="#29B5E8" stroke-width="10" stroke-linecap="round" fill="none"/><path d="M152 52 Q176 46 186 32" stroke="#0ea5d0" stroke-width="7" stroke-linecap="round" fill="none"/><ellipse cx="68" cy="60" rx="16" ry="19" fill="white"/><ellipse cx="112" cy="60" rx="16" ry="19" fill="white"/><circle cx="72" cy="63" r="10" fill="#1A202C"/><circle cx="116" cy="63" r="10" fill="#1A202C"/><circle cx="77" cy="58" r="4.5" fill="white"/><circle cx="121" cy="58" r="4.5" fill="white"/><circle cx="68" cy="55" r="2" fill="white"/><circle cx="112" cy="55" r="2" fill="white"/><ellipse cx="46" cy="74" rx="9" ry="4" fill="rgba(41,181,232,.3)"/><ellipse cx="134" cy="74" rx="9" ry="4" fill="rgba(41,181,232,.3)"/><rect x="38" y="110" width="22" height="34" rx="11" fill="#2D3748"/><rect x="120" y="110" width="22" height="34" rx="11" fill="#2D3748"/><circle cx="44" cy="144" r="8" fill="#2D3748"/><circle cx="54" cy="146" r="7" fill="#2D3748"/><circle cx="126" cy="144" r="8" fill="#2D3748"/><circle cx="136" cy="146" r="7" fill="#2D3748"/></svg>
+      <div style="padding-top:36px;padding-bottom:12px;text-align:center">
+        <div class="result-icon" id="result-icon"></div>
+        <div class="result-title" id="result-title"></div>
+        <div class="result-msg" id="result-msg"></div>
+      </div>
+      <div id="win-card" style="display:none">
+        <p class="text-center text-sm text-gray mb-16">Show this code at the booth to claim your swag:</p>
+        <div class="code-box" id="win-code"></div>
+        <p class="text-center text-sm text-gray">Code valid for today only</p>
+      </div>
+      <button class="btn btn-primary" id="result-btn" onclick="handleResultAction()">Try Again</button>
+    </div>
+    <p class="page-footer">This game is developed using Snowflake CoCo in under 10 minutes — Ask our booth staff how this is done!</p>
+  </div>
+
+  <!-- ADMIN PANEL -->
+  <div id="step-admin" class="step">
+    <div class="card" style="position:relative;overflow:visible;margin-top:140px;padding-bottom:12px">
+      <svg class="ninja-peek" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="90" cy="58" r="58" fill="#2D3748"/><ellipse cx="90" cy="68" rx="40" ry="22" fill="#4A5568"/><rect x="28" y="34" width="124" height="24" rx="12" fill="#29B5E8"/><path d="M152 40 Q174 28 180 8" stroke="#29B5E8" stroke-width="10" stroke-linecap="round" fill="none"/><path d="M152 52 Q176 46 186 32" stroke="#0ea5d0" stroke-width="7" stroke-linecap="round" fill="none"/><ellipse cx="68" cy="60" rx="16" ry="19" fill="white"/><ellipse cx="112" cy="60" rx="16" ry="19" fill="white"/><circle cx="72" cy="63" r="10" fill="#1A202C"/><circle cx="116" cy="63" r="10" fill="#1A202C"/><circle cx="77" cy="58" r="4.5" fill="white"/><circle cx="121" cy="58" r="4.5" fill="white"/><circle cx="68" cy="55" r="2" fill="white"/><circle cx="112" cy="55" r="2" fill="white"/><ellipse cx="46" cy="74" rx="9" ry="4" fill="rgba(41,181,232,.3)"/><ellipse cx="134" cy="74" rx="9" ry="4" fill="rgba(41,181,232,.3)"/><rect x="38" y="110" width="22" height="34" rx="11" fill="#2D3748"/><rect x="120" y="110" width="22" height="34" rx="11" fill="#2D3748"/><circle cx="44" cy="144" r="8" fill="#2D3748"/><circle cx="54" cy="146" r="7" fill="#2D3748"/><circle cx="126" cy="144" r="8" fill="#2D3748"/><circle cx="136" cy="146" r="7" fill="#2D3748"/></svg>
+      <div class="header" style="padding-top:36px;padding-bottom:16px">
+        <h1>Admin Panel</h1>
+        <p>Manage attendee submissions</p>
+      </div>
+    </div>
+    <div class="admin-bar">
+      <span id="admin-count">0 submissions</span>
+      <div>
+        <button class="btn btn-primary" style="width:auto;padding:8px 16px;font-size:.8rem" onclick="exportCSV()">Export CSV</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="admin-table" id="admin-table"></div>
+    </div>
+    <div class="card">
+      <button class="btn btn-danger" onclick="clearAllData()">Clear All Data</button>
+      <button class="btn btn-outline mt-8" onclick="goToStep('step-form')">Back to Game</button>
+    </div>
+    <p class="page-footer">This game is developed using Snowflake CoCo in under 10 minutes — Ask our booth staff how this is done!</p>
+  </div>
+</div>
+
+<div class="confetti-container" id="confetti-container"></div>
+
+<script>
+// ── CONFIG ──
+const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbytxrxtSRo08__IdrOly1tPqkzMgsSEbxDR88yEXYRFYGFolTfao7a2q26fQMwuWVv0jg/exec';
+
+const WORDS = [
+  { word:'PLATFORM', clue:'Across 1', dir:'across', row:5, col:0, num:1 },
+  { word:'HORIZON',  clue:'Down 2',   dir:'down',   row:0, col:5, num:2 },
+  { word:'COWORK',   clue:'Across 3', dir:'across', row:2, col:1, num:3 }
+];
+const GRID_COLS = 8, GRID_ROWS = 7;
+
+// ── STATE ──
+let cells = {};       // key: "row-col" → { letter, words:[], el }
+let selectedCell = null;
+let selectedWord = null;
+let currentEntry = {};
+let gameCompleted = false;
+
+// ── INIT ──
+document.addEventListener('DOMContentLoaded', () => {
+  if (location.search.includes('admin')) {
+    goToStep('step-admin');
+    renderAdmin();
+  }
+  buildGrid();
+  setupKeyboard();
+});
+
+// ── NAVIGATION ──
+function goToStep(id) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+// ── FORM ──
+function submitForm() {
+  const fields = [
+    { id:'f-first', validate: v => v.trim().length > 0 },
+    { id:'f-last',  validate: v => v.trim().length > 0 },
+    { id:'f-email', validate: v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) },
+    { id:'f-phone', validate: v => v.trim().length >= 6 },
+    { id:'f-company', validate: v => v.trim().length > 0 },
+    { id:'f-title', validate: v => v.trim().length > 0 }
+  ];
+
+  let valid = true;
+  fields.forEach(f => {
+    const input = document.getElementById(f.id);
+    const err = input.parentElement.querySelector('.error-msg');
+    if (!f.validate(input.value)) {
+      input.classList.add('error');
+      err.style.display = 'block';
+      valid = false;
+    } else {
+      input.classList.remove('error');
+      err.style.display = 'none';
+    }
+  });
+
+  if (!valid) return;
+
+  currentEntry = {
+    firstName: document.getElementById('f-first').value.trim(),
+    lastName: document.getElementById('f-last').value.trim(),
+    email: document.getElementById('f-email').value.trim(),
+    phone: document.getElementById('f-phone').value.trim(),
+    company: document.getElementById('f-company').value.trim(),
+    jobTitle: document.getElementById('f-title').value.trim(),
+    timestamp: new Date().toISOString(),
+    result: 'incomplete'
+  };
+
+  goToStep('step-game');
+  clearGrid();
+}
+
+// ── CROSSWORD GRID ──
+function buildGrid() {
+  const grid = document.getElementById('crossword-grid');
+  const activeCells = new Set();
+
+  WORDS.forEach((w, wi) => {
+    for (let i = 0; i < w.word.length; i++) {
+      const r = w.dir === 'across' ? w.row : w.row + i;
+      const c = w.dir === 'across' ? w.col + i : w.col;
+      const key = `${r}-${c}`;
+      activeCells.add(key);
+      if (!cells[key]) cells[key] = { letter: w.word[i], words: [], input: '' };
+      cells[key].words.push({ wordIndex: wi, charIndex: i });
+    }
+  });
+
+  for (let r = 0; r < GRID_ROWS; r++) {
+    for (let c = 0; c < GRID_COLS; c++) {
+      const key = `${r}-${c}`;
+      const el = document.createElement('div');
+      el.className = 'cell';
+      el.style.gridRow = r + 1;
+      el.style.gridColumn = c + 1;
+
+      if (!activeCells.has(key)) {
+        el.classList.add('blank');
+      } else {
+        const cellData = cells[key];
+        cellData.el = el;
+        cellData.row = r;
+        cellData.col = c;
+
+        // Number label
+        const numWord = WORDS.find((w) => w.row === r && w.col === c);
+        if (numWord) {
+          const numEl = document.createElement('span');
+          numEl.className = 'number';
+          numEl.textContent = numWord.num;
+          el.appendChild(numEl);
+        }
+
+        // Letter display
+        const letterEl = document.createElement('span');
+        letterEl.className = 'letter';
+        letterEl.textContent = '';
+        el.appendChild(letterEl);
+
+        el.addEventListener('click', () => onCellClick(key));
+      }
+      grid.appendChild(el);
+    }
+  }
+}
+
+function onCellClick(key) {
+  const cellData = cells[key];
+  if (!cellData || !cellData.el) return;
+
+  // Toggle direction if clicking same cell
+  if (selectedCell === key && cellData.words.length > 1) {
+    const currentWi = selectedWord;
+    const other = cellData.words.find(w => w.wordIndex !== currentWi);
+    if (other) selectedWord = other.wordIndex;
+  } else {
+    selectedCell = key;
+    selectedWord = cellData.words[0].wordIndex;
+  }
+
+  highlightWord(selectedWord, key);
+  focusKeyboard();
+}
+
+function selectClue(wordIndex) {
+  const w = WORDS[wordIndex];
+  const key = `${w.row}-${w.col}`;
+  selectedCell = key;
+  selectedWord = wordIndex;
+  highlightWord(wordIndex, key);
+
+  document.querySelectorAll('.clue-item').forEach(el => el.classList.remove('active'));
+  document.querySelector(`.clue-item[data-word="${wordIndex}"]`).classList.add('active');
+  focusKeyboard();
+}
+
+function highlightWord(wordIndex, activeKey) {
+  // Clear all highlights
+  Object.values(cells).forEach(c => {
+    if (c.el) {
+      c.el.classList.remove('selected', 'highlighted');
+    }
+  });
+  document.querySelectorAll('.clue-item').forEach(el => el.classList.remove('active'));
+
+  // Highlight word cells
+  const w = WORDS[wordIndex];
+  for (let i = 0; i < w.word.length; i++) {
+    const r = w.dir === 'across' ? w.row : w.row + i;
+    const c = w.dir === 'across' ? w.col + i : w.col;
+    const k = `${r}-${c}`;
+    if (cells[k] && cells[k].el) {
+      cells[k].el.classList.add(k === activeKey ? 'selected' : 'highlighted');
+    }
+  }
+
+  document.querySelector(`.clue-item[data-word="${wordIndex}"]`).classList.add('active');
+}
+
+// ── KEYBOARD ──
+function setupKeyboard() {
+  const inp = document.getElementById('keyboard-input');
+  inp.addEventListener('input', (e) => {
+    const val = e.target.value.toUpperCase().replace(/[^A-Z]/g, '');
+    if (val.length > 0 && selectedCell) {
+      enterLetter(val[val.length - 1]);
+    }
+    inp.value = '';
+  });
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      deleteLetter();
+    }
+  });
+}
+
+function focusKeyboard() {
+  const inp = document.getElementById('keyboard-input');
+  inp.value = '';
+  inp.focus();
+}
+
+function enterLetter(ch) {
+  if (!selectedCell) return;
+  const cellData = cells[selectedCell];
+  if (!cellData) return;
+
+  cellData.input = ch;
+  const letterEl = cellData.el.querySelector('.letter');
+  letterEl.textContent = ch;
+
+  // Clear validation styles
+  cellData.el.classList.remove('correct', 'incorrect');
+
+  advanceToNext();
+}
+
+function deleteLetter() {
+  if (!selectedCell) return;
+  const cellData = cells[selectedCell];
+  if (!cellData) return;
+
+  if (cellData.input === '') {
+    retreatToPrev();
+    const prevData = cells[selectedCell];
+    if (prevData) {
+      prevData.input = '';
+      prevData.el.querySelector('.letter').textContent = '';
+      prevData.el.classList.remove('correct', 'incorrect');
+    }
+  } else {
+    cellData.input = '';
+    cellData.el.querySelector('.letter').textContent = '';
+    cellData.el.classList.remove('correct', 'incorrect');
+  }
+}
+
+function advanceToNext() {
+  if (selectedWord === null) return;
+  const w = WORDS[selectedWord];
+  const cellData = cells[selectedCell];
+  const wRef = cellData.words.find(wr => wr.wordIndex === selectedWord);
+  if (!wRef) return;
+
+  const nextIdx = wRef.charIndex + 1;
+  if (nextIdx < w.word.length) {
+    const nr = w.dir === 'across' ? w.row : w.row + nextIdx;
+    const nc = w.dir === 'across' ? w.col + nextIdx : w.col;
+    const nk = `${nr}-${nc}`;
+    selectedCell = nk;
+    highlightWord(selectedWord, nk);
+  }
+}
+
+function retreatToPrev() {
+  if (selectedWord === null) return;
+  const w = WORDS[selectedWord];
+  const cellData = cells[selectedCell];
+  const wRef = cellData.words.find(wr => wr.wordIndex === selectedWord);
+  if (!wRef) return;
+
+  const prevIdx = wRef.charIndex - 1;
+  if (prevIdx >= 0) {
+    const pr = w.dir === 'across' ? w.row : w.row + prevIdx;
+    const pc = w.dir === 'across' ? w.col + prevIdx : w.col;
+    const pk = `${pr}-${pc}`;
+    selectedCell = pk;
+    highlightWord(selectedWord, pk);
+  }
+}
+
+// ── VALIDATION ──
+function checkAnswers() {
+  let allCorrect = true;
+  let wordResults = [];
+
+  WORDS.forEach((w, wi) => {
+    let wordCorrect = true;
+    for (let i = 0; i < w.word.length; i++) {
+      const r = w.dir === 'across' ? w.row : w.row + i;
+      const c = w.dir === 'across' ? w.col + i : w.col;
+      const k = `${r}-${c}`;
+      const cellData = cells[k];
+      const isCorrect = cellData.input === w.word[i];
+      cellData.el.classList.remove('correct', 'incorrect', 'selected', 'highlighted');
+      cellData.el.classList.add(isCorrect ? 'correct' : 'incorrect');
+      if (!isCorrect) { wordCorrect = false; allCorrect = false; }
+    }
+    wordResults.push({ word: w.word, correct: wordCorrect });
+  });
+
+  gameCompleted = true;
+  currentEntry.result = allCorrect ? 'WIN' : 'LOSE';
+  currentEntry.answers = wordResults.map(r => `${r.word}:${r.correct ? 'Y' : 'N'}`).join(', ');
+  saveEntry();
+
+  setTimeout(() => showResult(allCorrect), 600);
+}
+
+function clearGrid() {
+  Object.values(cells).forEach(c => {
+    if (c.el) {
+      c.input = '';
+      c.el.querySelector('.letter').textContent = '';
+      c.el.classList.remove('correct', 'incorrect', 'selected', 'highlighted');
+    }
+  });
+  selectedCell = null;
+  selectedWord = null;
+  gameCompleted = false;
+}
+
+// ── RESULTS ──
+function showResult(won) {
+  const icon = document.getElementById('result-icon');
+  const title = document.getElementById('result-title');
+  const msg = document.getElementById('result-msg');
+  const btn = document.getElementById('result-btn');
+  const winCard = document.getElementById('win-card');
+
+  if (won) {
+    icon.textContent = '\u{1F389}';
+    title.textContent = 'Congratulations!';
+    title.style.color = 'var(--green)';
+    msg.textContent = 'You nailed all 3 keywords! Show your completion code at the Snowflake booth to claim your swag.';
+    btn.textContent = 'Done';
+    btn.className = 'btn btn-success';
+    winCard.style.display = 'block';
+
+    // Generate code
+    const code = generateCode();
+    document.getElementById('win-code').textContent = code;
+    currentEntry.completionCode = code;
+    saveEntry();
+
+    launchConfetti();
+  } else {
+    icon.textContent = '\u{1F914}';
+    title.textContent = 'Not Quite!';
+    title.style.color = 'var(--red)';
+    msg.textContent = 'Some answers were incorrect. Give it another shot \u2014 you\'re close!';
+    btn.textContent = 'Try Again';
+    btn.className = 'btn btn-primary';
+    winCard.style.display = 'none';
+  }
+
+  goToStep('step-result');
+}
+
+function handleResultAction() {
+  if (currentEntry.result === 'WIN') {
+    // Reset for next attendee
+    location.reload();
+  } else {
+    goToStep('step-game');
+    clearGrid();
+    gameCompleted = false;
+  }
+}
+
+function generateCode() {
+  const name = (currentEntry.firstName[0] + currentEntry.lastName[0]).toUpperCase();
+  const ts = Date.now().toString(36).toUpperCase().slice(-4);
+  const rand = Math.random().toString(36).substring(2, 4).toUpperCase();
+  return `SF-${name}${ts}${rand}`;
+}
+
+// ── CONFETTI ──
+function launchConfetti() {
+  const container = document.getElementById('confetti-container');
+  const colors = ['#29B5E8','#00D4AA','#FF6B6B','#FFD93D','#6C5CE7','#FD79A8'];
+  for (let i = 0; i < 80; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti';
+    el.style.left = Math.random() * 100 + '%';
+    el.style.background = colors[Math.floor(Math.random() * colors.length)];
+    el.style.width = (Math.random() * 8 + 6) + 'px';
+    el.style.height = (Math.random() * 8 + 6) + 'px';
+    el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+    el.style.animationDuration = (Math.random() * 2 + 2) + 's';
+    el.style.animationDelay = (Math.random() * 1.5) + 's';
+    container.appendChild(el);
+  }
+  setTimeout(() => container.innerHTML = '', 5000);
+}
+
+// ── DATA STORAGE ──
+function getEntries() {
+  try { return JSON.parse(localStorage.getItem('sf_game_entries') || '[]'); }
+  catch { return []; }
+}
+
+function saveEntry() {
+  const entries = getEntries();
+  const idx = entries.findIndex(e => e.email === currentEntry.email && e.timestamp === currentEntry.timestamp);
+  if (idx >= 0) entries[idx] = currentEntry;
+  else entries.push(currentEntry);
+  localStorage.setItem('sf_game_entries', JSON.stringify(entries));
+
+  // Send to backend if configured
+  if (BACKEND_URL) {
+    fetch(BACKEND_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(currentEntry),
+      mode: 'no-cors'
+    }).catch(() => {});
+  }
+}
+
+// ── ADMIN ──
+function renderAdmin() {
+  const entries = getEntries();
+  document.getElementById('admin-count').textContent = `${entries.length} submission${entries.length !== 1 ? 's' : ''}`;
+
+  const table = document.getElementById('admin-table');
+  if (entries.length === 0) {
+    table.innerHTML = '<p class="text-center text-gray text-sm">No submissions yet</p>';
+    return;
+  }
+
+  let html = '<table><thead><tr><th>Time</th><th>Name</th><th>Email</th><th>Phone</th><th>Company</th><th>Title</th><th>Result</th><th>Code</th></tr></thead><tbody>';
+  entries.slice().reverse().forEach(e => {
+    const time = new Date(e.timestamp).toLocaleString();
+    const badge = e.result === 'WIN'
+      ? '<span class="badge badge-win">WIN</span>'
+      : e.result === 'LOSE'
+        ? '<span class="badge badge-lose">LOSE</span>'
+        : '<span class="badge" style="background:var(--light);color:var(--gray)">-</span>';
+    html += `<tr>
+      <td>${time}</td>
+      <td>${esc(e.firstName)} ${esc(e.lastName)}</td>
+      <td>${esc(e.email)}</td>
+      <td>${esc(e.phone)}</td>
+      <td>${esc(e.company)}</td>
+      <td>${esc(e.jobTitle)}</td>
+      <td>${badge}</td>
+      <td>${esc(e.completionCode || '-')}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  table.innerHTML = html;
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function exportCSV() {
+  const entries = getEntries();
+  if (entries.length === 0) { alert('No data to export'); return; }
+
+  const headers = ['Timestamp','First Name','Last Name','Email','Phone','Company','Job Title','Result','Completion Code','Answers'];
+  const rows = entries.map(e => [
+    e.timestamp, e.firstName, e.lastName, e.email, e.phone,
+    e.company, e.jobTitle, e.result, e.completionCode || '', e.answers || ''
+  ]);
+
+  let csv = headers.join(',') + '\n';
+  rows.forEach(row => {
+    csv += row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',') + '\n';
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `snowflake-challenge-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function clearAllData() {
+  if (confirm('Delete ALL submissions? This cannot be undone.')) {
+    localStorage.removeItem('sf_game_entries');
+    renderAdmin();
+  }
+}
+</script>
+</body>
+</html>
